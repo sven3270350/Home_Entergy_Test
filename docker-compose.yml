@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-smarthome}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Add initialization scripts if needed
+      - ./services/auth/app/database/init.sql:/docker-entrypoint-initdb.d/1-auth.sql
+      - ./services/telemetry/app/database/init.sql:/docker-entrypoint-initdb.d/2-telemetry.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smarthome_net
+
+  auth_service:
+    build: 
+      context: ./services/auth
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-smarthome}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRATION_MINUTES=60
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - smarthome_net
+    volumes:
+      - ./services/auth:/app
+      - auth_node_modules:/app/node_modules
+
+  telemetry_service:
+    build: 
+      context: ./services/telemetry
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-smarthome}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth_service:
+        condition: service_started
+    networks:
+      - smarthome_net
+    volumes:
+      - ./services/telemetry:/app
+      - telemetry_node_modules:/app/node_modules
+
+  chat_service:
+    build: 
+      context: ./services/chat
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-smarthome}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TELEMETRY_SERVICE_URL=http://telemetry_service:8001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      telemetry_service:
+        condition: service_started
+    networks:
+      - smarthome_net
+    volumes:
+      - ./services/chat:/app
+      - chat_node_modules:/app/node_modules
+
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_AUTH_API_URL=http://localhost:8000
+      - REACT_APP_TELEMETRY_API_URL=http://localhost:8001
+      - REACT_APP_CHAT_API_URL=http://localhost:8002
+      - NODE_ENV=development
+    depends_on:
+      - auth_service
+      - telemetry_service
+      - chat_service
+    networks:
+      - smarthome_net
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+
+  # Development tools
+  adminer:
+    image: adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - smarthome_net
+
+networks:
+  smarthome_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  auth_node_modules:
+  telemetry_node_modules:
+  chat_node_modules:
+  frontend_node_modules: 
