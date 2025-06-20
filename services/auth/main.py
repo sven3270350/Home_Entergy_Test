@@ -34,6 +34,18 @@ app.add_middleware(
 async def startup_event():
     init_db()
 
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    try:
+        # Try to make a simple query to verify database connection
+        db.execute("SELECT 1")
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Service unhealthy: {str(e)}"
+        )
+
 @app.post("/api/auth/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
     # Check if user exists
