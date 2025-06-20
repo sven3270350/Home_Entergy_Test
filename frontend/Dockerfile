@@ -1,10 +1,15 @@
-FROM node:18-alpine
+# Build stage
+FROM node:18-alpine as build
 
 WORKDIR /app
 
-# Install dependencies
+# Copy package files
 COPY package*.json ./
-RUN npm install
+
+# Install dependencies with security fixes
+RUN npm install -g npm@latest && \
+    npm install && \
+    npm audit fix --force
 
 # Copy the rest of the application
 COPY . .
@@ -12,8 +17,16 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Install serve to run the application
+# Production stage
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install serve
 RUN npm install -g serve
+
+# Copy build files from build stage
+COPY --from=build /app/build ./build
 
 # Expose the port the app runs on
 EXPOSE 3000
