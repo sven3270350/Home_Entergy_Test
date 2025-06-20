@@ -195,6 +195,18 @@ def get_device_stats(
         total_energy_watt_hours=total_energy
     )
 
+@app.get("/health")
+def health_check(db: Session = Depends(get_db)):
+    try:
+        # Try to make a simple query to verify database connection
+        db.execute("SELECT 1")
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Service unhealthy: {str(e)}"
+        )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001) 

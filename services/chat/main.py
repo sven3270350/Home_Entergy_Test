@@ -70,6 +70,19 @@ async def query_energy_data(
         time_period=query_result.time_period
     )
 
+@app.get("/health")
+def health_check():
+    try:
+        # Check if OpenAI API key is configured
+        if not os.getenv("OPENAI_API_KEY"):
+            raise ValueError("OpenAI API key not configured")
+        return {"status": "healthy", "openai": "configured"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Service unhealthy: {str(e)}"
+        )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8002) 
