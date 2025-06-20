@@ -7,14 +7,14 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps && \
+    npm install -g react-scripts ajv@8.12.0 ajv-keywords@5.1.0 schema-utils@4.2.0
 
 # Copy the rest of the application
 COPY . .
 
-# Install react-scripts globally and then build
-RUN npm install -g react-scripts && \
-    CI=false npm run build
+# Build the application
+RUN CI=false npm run build
 
 # Production stage
 FROM node:20-alpine
