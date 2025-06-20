@@ -6,15 +6,15 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies with security fixes
-RUN npm install && \
-    npm audit fix --force
+# Clean install dependencies
+RUN npm ci
 
 # Copy the rest of the application
 COPY . .
 
-# Build the application
-RUN npm run build
+# Install react-scripts globally and then build
+RUN npm install -g react-scripts && \
+    npm run build
 
 # Production stage
 FROM node:20-alpine
